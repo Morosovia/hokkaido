@@ -1,0 +1,6 @@
+{
+  "name": "北海道十日遊 旅遊小工具",
+  "description": "北海道十日遊專屬的手機旅遊小工具，包含每日時間軸行程、精美簡約地圖路徑以及多人同步雲端記帳本。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
