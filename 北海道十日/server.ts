@@ -8,15 +8,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = 3000;
+// 核心修正：生產環境下，新平台會自動分配 process.env.PORT 程式碼，必須優先讀取
+const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-const IS_PROD = process.env.NODE_ENV === "production";
-
-const DATA_DIR = IS_PROD ? "/tmp" : path.join(__dirname, "data");
+const DATA_DIR = path.join(__dirname, "data");
 const DATA_FILE = path.join(DATA_DIR, "expenses.json");
 
+// Default initial expenses
 const defaultExpenses = [
   {
     id: "exp-1",
@@ -28,87 +28,9 @@ const defaultExpenses = [
     note: "台北桃園到新千歲來回機票",
     timestamp: Date.now() - 9 * 24 * 3600 * 1000,
     createdBy: "Olivia"
-  },
-  {
-    id: "exp-2",
-    day: 1,
-    title: "札幌美居酒店 2晚住宿費",
-    amount: 24000,
-    currency: "JPY",
-    category: "其他",
-    note: "札幌市中心住宿，步行可達狸小路",
-    timestamp: Date.now() - 8 * 24 * 3600 * 1000,
-    createdBy: "Olivia"
-  },
-  {
-    id: "exp-3",
-    day: 2,
-    title: "宗谷岬最北端紀念碑拉麵",
-    amount: 1200,
-    currency: "JPY",
-    category: "餐飲食",
-    note: "日本最北端之地的海膽拉麵",
-    timestamp: Date.now() - 7 * 24 * 3600 * 1000,
-    createdBy: "Olivia"
-  },
-  {
-    id: "exp-4",
-    day: 3,
-    title: "禮文島 Heartland Ferry 渡輪船票",
-    amount: 5800,
-    currency: "JPY",
-    category: "交通",
-    note: "稚內往返禮文島二等甲板船票",
-    timestamp: Date.now() - 6 * 24 * 3600 * 1000,
-    createdBy: "Olivia"
-  },
-  {
-    id: "exp-5",
-    day: 5,
-    title: "富田農場薰衣草霜淇淋",
-    amount: 450,
-    currency: "JPY",
-    category: "餐飲",
-    note: "必吃招牌薰衣草霜淇淋",
-    timestamp: Date.now() - 4 * 24 * 3600 * 1000,
-    createdBy: "Olivia"
-  },
-  {
-    id: "exp-6",
-    day: 7,
-    title: "登別尼克斯海洋公園門票 (含企鵝遊行)",
-    amount: 3800,
-    currency: "JPY",
-    category: "景點/門票",
-    note: "看可愛企鵝散步、海豚表演",
-    timestamp: Date.now() - 2 * 24 * 3600 * 1000,
-    createdBy: "Olivia"
-  },
-  {
-    id: "exp-7",
-    day: 8,
-    title: "函館山纜車往返乘車券",
-    amount: 1800,
-    currency: "JPY",
-    category: "交通",
-    note: "欣賞百萬夜景的纜車車票",
-    timestamp: Date.now() - 1 * 24 * 3600 * 1000,
-    createdBy: "Olivia"
-  },
-  {
-    id: "exp-8",
-    day: 10,
-    title: "函館幸運小丑漢堡午餐",
-    amount: 980,
-    currency: "JPY",
-    category: "餐飲",
-    note: "北海道限定！中華炸雞漢堡套餐",
-    timestamp: Date.now(),
-    createdBy: "Olivia"
   }
 ];
 
-// Ensure data directory and file exist
 async function initDataFile() {
   try {
     await fs.mkdir(DATA_DIR, { recursive: true });
@@ -154,7 +76,6 @@ app.post("/api/expenses", async (req, res) => {
     await fs.writeFile(DATA_FILE, JSON.stringify(expenses, null, 2), "utf-8");
     res.status(201).json(newExpense);
   } catch (error) {
-    console.error("Failed to add expense:", error);
     res.status(500).json({ error: "Failed to save expense" });
   }
 });
@@ -198,20 +119,26 @@ app.put("/api/expenses/:id", async (req, res) => {
   }
 });
 
+// 核心修正：新平台需要 Express 在生產環境下也提供靜態網頁與接聽服務
 const startServer = async () => {
-  if (!IS_PROD) {
+  if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
-
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`Server running on http://localhost:${PORT}`);
+  } else {
+    const distPath = path.join(process.cwd(), "dist");
+    app.use(express.static(distPath));
+    app.get("*", (req, res) => {
+      res.sendFile(path.join(distPath, "index.html"));
     });
   }
+
+  // 確保無論在本地還是雲端，程式碼都會啟動監聽監聽埠
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on port ${PORT}`);
+  });
 };
 
 startServer();
-
-export default app;
