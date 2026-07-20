@@ -12,17 +12,17 @@ const PORT = 3000;
 
 app.use(express.json());
 
-// Path to data file
-const DATA_DIR = path.join(__dirname, "data");
+const IS_PROD = process.env.NODE_ENV === "production";
+
+const DATA_DIR = IS_PROD ? "/tmp" : path.join(__dirname, "data");
 const DATA_FILE = path.join(DATA_DIR, "expenses.json");
 
-// Default initial expenses
 const defaultExpenses = [
   {
     id: "exp-1",
     day: 1,
     title: "星宇航空 JX850 機票 (TPE-CTS)",
-    amount: 68000, // in JPY
+    amount: 68000,
     currency: "JPY",
     category: "交通",
     note: "台北桃園到新千歲來回機票",
@@ -46,7 +46,7 @@ const defaultExpenses = [
     title: "宗谷岬最北端紀念碑拉麵",
     amount: 1200,
     currency: "JPY",
-    category: "餐飲",
+    category: "餐飲食",
     note: "日本最北端之地的海膽拉麵",
     timestamp: Date.now() - 7 * 24 * 3600 * 1000,
     createdBy: "Olivia"
@@ -172,7 +172,6 @@ app.delete("/api/expenses/:id", async (req, res) => {
   }
 });
 
-// Update an expense
 app.put("/api/expenses/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -199,25 +198,20 @@ app.put("/api/expenses/:id", async (req, res) => {
   }
 });
 
-// Vite Middleware for development, static assets for production
 const startServer = async () => {
-  if (process.env.NODE_ENV !== "production") {
+  if (!IS_PROD) {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
     });
   }
-
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
 };
 
 startServer();
+
+export default app;
