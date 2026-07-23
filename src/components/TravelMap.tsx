@@ -136,52 +136,151 @@ export const TravelMap: React.FC<TravelMapProps> = ({ activeDay, allDays }) => {
   // Filter out meals/hotels from activities to show scenic / airport waypoints only
   const getDayWaypoints = (dayData: DayItinerary) => {
     return dayData.activities.filter((act) => {
-      // airports always included
-      if (act.schematicId === "tpe" || act.schematicId === "cts" || act.schematicId === "hkd_airport") return true;
-      // skip meals, hotel, transfers from drawing track
-      if (act.type === "meal" || act.type === "hotel" || act.type === "transfer") return false;
-      return !!act.schematicId;
+      const isMeal = act.icon === "meal" || 
+                     act.title.includes("午餐") || 
+                     act.title.includes("晚餐") || 
+                     act.title.includes("早餐") || 
+                     act.title.includes("拉麵") || 
+                     act.title.includes("燒肉") || 
+                     act.title.includes("螃蟹") || 
+                     act.title.includes("蟹本家") || 
+                     act.title.includes("湯咖哩") || 
+                     act.title.includes("食堂") ||
+                     act.title.includes("小丑漢堡") ||
+                     act.title.includes("下午茶") ||
+                     act.description?.includes("吃");
+      const isHotel = act.icon === "hotel" && (act.title.includes("入住") || act.title.includes("飯店") || act.title.includes("Hotel"));
+      
+      return !isMeal && !isHotel;
     });
   };
 
-  // 1. Calculate active day points
   const activeWaypoints = getDayWaypoints(activeDay);
-  const activePoints = activeWaypoints
-    .map((w) => getCoords(w.schematicId!))
-    .filter((p) => p.name !== "");
 
-  // 2. Gather active day stations
-  const activeStations = Object.entries(SCHEMATIC_COORDS)
-    .map(([key, raw]) => {
-      // Find all days that visit this schematic node
-      const visitingDays = allDays
-        .filter((d) => getDayWaypoints(d).some((act) => act.schematicId === key))
-        .map((d) => d.day);
-      
-      return [key, {
-        ...getCoords(key),
-        days: visitingDays
-      }] as const;
-    })
-    .filter(([_, data]) => data.days.length > 0 && data.name !== "");
+  const getWaypointKey = (wp: any): string | null => {
+    if (!wp.coordinates) {
+      const found = Object.entries(COORDS).find(([_, val]) => {
+        return wp.title.includes(val.name) || (wp.locationName && wp.locationName.includes(val.name));
+      });
+      return found ? found[0] : null;
+    }
+    const found = Object.entries(COORDS).find(([_, val]) => {
+      return val.name === wp.coordinates.name || 
+             (Math.abs(val.lat - wp.coordinates.lat) < 0.01 && Math.abs(val.lng - wp.coordinates.lng) < 0.01);
+    });
+    return found ? found[0] : null;
+  };
 
-  // 3. Generate all days lines path data for full map view
-  const allLinesData = allDays.map((d) => {
-    const waypoints = getDayWaypoints(d);
-    const points = waypoints.map((w) => getCoords(w.schematicId!)).filter((p) => p.name !== "");
-    const color = DAY_COLORS[(d.day - 1) % DAY_COLORS.length];
-    return { day: d.day, points, color };
-  });
+  const getDayPathPoints = (dayData: DayItinerary) => {
+    const waypoints = getDayWaypoints(dayData);
+    const points: { x: number; y: number; key: string; name: string; labelPos: string }[] = [];
+    
+    waypoints.forEach((wp) => {
+      const key = getWaypointKey(wp);
+      if (key) {
+        if (points.length === 0 || points[points.length - 1].key !== key) {
+          const coords = getCoords(key);
+          points.push({ x: coords.x, y: coords.y, key, name: coords.name, labelPos: coords.labelPos });
+        }
+      }
+    });
+    return points;
+  };
 
+  const activePoints = getDayPathPoints(activeDay);
   const activeColor = DAY_COLORS[(activeDay.day - 1) % DAY_COLORS.length];
 
-  // Map automatic focal center calculations based on active points bounds to auto-pan and zoom today's track
-  const getTransformProps = () => {
-    if (showAllLines || activePoints.length === 0) {
-      return { x: 0, y: 0, scale: 1.0 }; // Default overview zoom
+  // Map label offset and text anchors
+  const getLabelOffset = (pos: string) => {
+    switch (pos) {
+      case "t": return { dx: 0, dy: -14, textAnchor: "middle" };
+      case "b": return { dx: 0, dy: 18, textAnchor: "middle" };
+      case "l": return { dx: -12, dy: 3, textAnchor: "end" };
+      case "r": return { dx: 12, dy: 3, textAnchor: "start" };
+      case "tr": return { dx: 10, dy: -10, textAnchor: "start" };
+      case "tl": return { dx: -10, dy: -10, textAnchor: "end" };
+      case "br": return { dx: 10, dy: 12, textAnchor: "start" };
+      case "bl": return { dx: -10, dy: 12, textAnchor: "end" };
+      default: return { dx: 0, dy: 16, textAnchor: "middle" };
+    }
+  };
+
+  // Google map route redirect
+  const getGoogleMapsRouteLink = () => {
+    const mappableWaypoints = activeWaypoints.filter(wp => wp.locationName || wp.coordinates);
+    if (mappableWaypoints.length === 0) return null;
+    const origin = mappableWaypoints[0].locationName || mappableWaypoints[0].title;
+    const destination =
+      mappableWaypoints[mappableWaypoints.length - 1].locationName || mappableWaypoints[mappableWaypoints.length - 1].title;
+
+    let waypointsParam = "";
+    if (mappableWaypoints.length > 2) {
+      const mids = mappableWaypoints.slice(1, -1);
+      waypointsParam = mids
+        .map((w) => encodeURIComponent(w.locationName || w.title))
+        .join("|");
     }
 
-    // Get active segment bounding box in 600x340 coordinate space
+    return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(
+      origin
+    )}&destination=${encodeURIComponent(destination)}${
+      waypointsParam ? `&waypoints=${waypointsParam}` : ""
+    }&travelmode=driving`;
+  };
+
+  const routeLink = getGoogleMapsRouteLink();
+
+  // Compute all days' lines to display full network if toggle is active
+  const allLinesData = React.useMemo(() => {
+    return allDays.map((d) => {
+      const points = getDayPathPoints(d);
+      const color = DAY_COLORS[(d.day - 1) % DAY_COLORS.length];
+      return { day: d.day, points, color };
+    });
+  }, [allDays]);
+
+  // Unique list of all stations in the active lines for labels/dots rendering
+  const activeStations = React.useMemo(() => {
+    const stations: Record<string, { x: number; y: number; name: string; labelPos: string; days: number[] }> = {};
+    const daysToScan = showAllLines ? allDays : [activeDay];
+
+    daysToScan.forEach((d) => {
+      const pts = getDayPathPoints(d);
+      pts.forEach((p) => {
+        if (!stations[p.key]) {
+          stations[p.key] = { x: p.x, y: p.y, name: p.name, labelPos: p.labelPos, days: [] };
+        }
+        if (!stations[p.key].days.includes(d.day)) {
+          stations[p.key].days.push(d.day);
+        }
+      });
+    });
+    return Object.entries(stations);
+  }, [showAllLines, activeDay, allDays]);
+
+  // Format list of days to display in the labels. E.g. (D2-5) or (D1) or (D1/10)
+  const formatDayRange = (days: number[]) => {
+    if (days.length === 0) return "";
+    const sorted = [...days].sort((a, b) => a - b);
+    const isConsecutive = sorted.every((d, idx) => idx === 0 || d === sorted[idx - 1] + 1);
+    if (isConsecutive && sorted.length > 1) {
+      return `D${sorted[0]}-${sorted[sorted.length - 1]}`;
+    } else {
+      return `D${sorted.join("/")}`;
+    }
+  };
+
+  // GPU-Accelerated centering transform calculation for dynamic bounding box zooming
+  const transformStyle = React.useMemo(() => {
+    if (showAllLines || activePoints.length === 0) {
+      return {
+        transform: "translate(0px, 0px) scale(1)",
+        transformOrigin: "0 0",
+        transition: "transform 0.6s cubic-bezier(0.16, 1, 0.3, 1)",
+      };
+    }
+
+    // Get active path boundaries
     const xs = activePoints.map((p) => p.x);
     const ys = activePoints.map((p) => p.y);
     const minX = Math.min(...xs);
@@ -189,109 +288,75 @@ export const TravelMap: React.FC<TravelMapProps> = ({ activeDay, allDays }) => {
     const minY = Math.min(...ys);
     const maxY = Math.max(...ys);
 
-    const midX = (minX + maxX) / 2;
-    const midY = (minY + maxY) / 2;
-
-    // Bounding box size
     const dx = maxX - minX;
     const dy = maxY - minY;
 
-    // Target viewport size is 600x340. Define zoom scale.
-    // Cap zoom scale between 1.15x and 1.8x to prevent excessive zoom-in on single spots or giant gaps
-    let scale = 1.45;
-    if (dx > 0 || dy > 0) {
-      const scaleX = 480 / Math.max(dx, 1);
-      const scaleY = 260 / Math.max(dy, 1);
-      scale = Math.min(scaleX, scaleY);
-      scale = Math.max(1.15, Math.min(1.8, scale));
-    }
+    // Minimum dimensions to avoid zooming in too tight or dividing by zero
+    const finalDx = dx || 110;
+    const finalDy = dy || 90;
 
-    // Center shift vector relative to SVG's viewport center (300, 170)
-    const tx = 300 - midX * scale;
-    const ty = 170 - midY * scale;
+    // Center of the active points
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
 
-    return { x: tx, y: ty, scale };
-  };
-
-  const transform = getTransformProps();
-  const transformStyle = {
-    transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`,
-    transformOrigin: "0px 0px",
-    transition: "transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1.0)",
-  };
-
-  const getLabelOffset = (pos: string) => {
-    switch (pos) {
-      case "t": return { dx: 0, dy: -12, textAnchor: "middle" as const };
-      case "b": return { dx: 0, dy: 16, textAnchor: "middle" as const };
-      case "l": return { dx: -10, dy: 3, textAnchor: "end" as const };
-      case "r": return { dx: 10, dy: 3, textAnchor: "start" as const };
-      case "tl": return { dx: -8, dy: -8, textAnchor: "end" as const };
-      case "tr": return { dx: 8, dy: -8, textAnchor: "start" as const };
-      case "bl": return { dx: -8, dy: 12, textAnchor: "end" as const };
-      case "br": return { dx: 8, dy: 12, textAnchor: "start" as const };
-      default: return { dx: 0, dy: 12, textAnchor: "middle" as const };
-    }
-  };
-
-  // Combine overlapping days into ranges like D1 or D2-5
-  const formatDayRange = (days: number[]) => {
-    if (days.length === 0) return "";
-    const sorted = [...days].sort((a, b) => a - b);
+    // Screen dimensions: 600 width, 340 height
+    // Calculate scale factors, reserving 90px horizontal margin & 70px vertical margin for labels
+    const scaleX = (600 - 90) / finalDx;
+    const scaleY = (340 - 70) / finalDy;
     
-    // Check if contiguous sequence
-    let isContiguous = true;
-    for (let i = 1; i < sorted.length; i++) {
-      if (sorted[i] !== sorted[i - 1] + 1) {
-        isContiguous = false;
-        break;
-      }
-    }
+    // Choose the minimum scale factor to fit everything comfortably
+    let scale = Math.min(scaleX, scaleY);
+    
+    // Cap the scale between 1x and 2.8x to preserve elegant schematic readability
+    scale = Math.max(1.0, Math.min(2.8, scale));
 
-    if (isContiguous && sorted.length > 1) {
-      return `D${sorted[0]}-${sorted[sorted.length - 1]}`;
-    }
-    return sorted.map(d => `D${d}`).join(",");
-  };
+    // Calculate translation coordinates to center the bounding box exactly on (300, 170)
+    const tx = 300 - centerX * scale;
+    const ty = 170 - centerY * scale;
+
+    return {
+      transform: `translate(${tx.toFixed(1)}px, ${ty.toFixed(1)}px) scale(${scale.toFixed(2)})`,
+      transformOrigin: "0 0",
+      transition: "transform 0.6s cubic-bezier(0.16, 1, 0.3, 1)",
+    };
+  }, [showAllLines, activePoints]);
 
   return (
-    <div className="flex flex-col h-full bg-stone-50" id="map-container">
-      {/* Map Control Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-stone-200 bg-white shrink-0">
-        <div className="flex items-center gap-1.5">
-          <div className="p-1 rounded-lg bg-rose-50 text-rose-500">
-            <Compass className="w-4 h-4" />
-          </div>
-          <div>
-            <h3 className="text-xs font-bold text-stone-800">全體路線圖 (捷運風格)</h3>
-            <p className="text-[9px] text-stone-400">
-              {showAllLines ? "完整 10 天路線一覽" : `當日焦點：第 ${activeDay.day} 天 (${activeDay.title})`}
-            </p>
-          </div>
+    <div className="flex flex-col flex-1 min-h-0 bg-stone-50 border border-stone-200 rounded-2xl overflow-hidden shadow-xs" id="map-container">
+      {/* Header section (Compact & Responsive) */}
+      <div className="px-4 py-2.5 bg-white border-b border-stone-200 flex items-center justify-between gap-3 shrink-0">
+        <div className="flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: activeColor }} />
+          <h3 className="text-xs sm:text-sm font-bold text-stone-800 tracking-tight">
+            第 {activeDay.day} 天捷運路網
+          </h3>
         </div>
 
-        {/* View Mode Switcher */}
-        <div className="flex bg-stone-100 p-0.5 rounded-lg border border-stone-200/40 shrink-0">
+        <div className="flex items-center gap-1.5">
+          {/* Taipei Metro Network Toggle */}
           <button
-            onClick={() => setShowAllLines(false)}
-            className={`px-2 py-1 text-[9px] font-bold rounded-md transition-all ${
-              !showAllLines
-                ? "bg-white text-stone-800 shadow-xs"
-                : "text-stone-400 hover:text-stone-600"
-            }`}
-          >
-            單日焦點
-          </button>
-          <button
-            onClick={() => setShowAllLines(true)}
-            className={`px-2 py-1 text-[9px] font-bold rounded-md transition-all ${
+            onClick={() => setShowAllLines(!showAllLines)}
+            className={`inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold rounded-lg border transition-all cursor-pointer ${
               showAllLines
-                ? "bg-white text-stone-800 shadow-xs"
-                : "text-stone-400 hover:text-stone-600"
+                ? "bg-rose-600 text-white border-rose-600 shadow-2xs"
+                : "bg-stone-50 hover:bg-stone-100 text-stone-700 border-stone-200"
             }`}
           >
-            完整路網
+            <ZoomIn className="w-3 h-3" />
+            {showAllLines ? "僅看今日焦點" : "看全體路線網"}
           </button>
+
+          {routeLink && (
+            <a
+              href={routeLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer shrink-0 shadow-2xs"
+              id="google-maps-btn"
+            >
+              開啟 google map
+            </a>
+          )}
         </div>
       </div>
 
@@ -482,54 +547,71 @@ export const TravelMap: React.FC<TravelMapProps> = ({ activeDay, allDays }) => {
         </div>
       </div>
 
-      {/* 第二個 DIV: Simple Horizontal Step Bar (今日主要站點序列) */}
-      <div className="flex-1 bg-white p-3 flex flex-col justify-center min-h-[95px] overflow-hidden">
-        <div className="text-[10px] font-bold text-stone-500 mb-2 flex items-center gap-1">
-          <Clock className="w-3.5 h-3.5 text-stone-400" />
-          <span>今日主要路線</span>
-        </div>
-        
-        <div className="flex items-center w-full overflow-x-auto py-1 scrollbar-none" id="step-scroller">
-          {activePoints.length === 0 ? (
-            <div className="text-[10px] text-stone-400 italic py-2">本日無特選定點線路行程 (例如自由活動/返程)</div>
-          ) : (
-            <div className="flex items-center gap-1 px-1 min-w-full">
-              {activePoints.map((pt, index) => {
-                const isLast = index === activePoints.length - 1;
-                return (
-                  <React.Fragment key={`step-${pt.name}-${index}`}>
-                    {/* Station item */}
-                    <div className="flex flex-col items-center shrink-0">
-                      <div 
-                        className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold border"
-                        style={{ 
-                          backgroundColor: activeColor + "15",
-                          borderColor: activeColor,
-                          color: activeColor 
-                        }}
-                      >
-                        {index + 1}
-                      </div>
-                      <span className="text-[10px] font-bold text-stone-800 mt-1 max-w-[55px] truncate text-center">
-                        {pt.name}
-                      </span>
-                    </div>
+      {/* 第二個 DIV: Main linear path list (Only text sequence) */}
+      <div className="flex-1 overflow-y-auto px-4 py-3 bg-white" id="route-timeline-viewport">
+        {activeWaypoints.length > 0 ? (
+          <div className="relative pl-4 py-1">
+            {/* Elegant vertical connection line */}
+            <div className="absolute left-[5px] top-3 bottom-3 w-px border-l border-stone-200" />
 
-                    {/* Connecting line */}
-                    {!isLast && (
-                      <div className="flex-1 min-w-[15px] h-[2px] bg-stone-200 -mt-4 relative">
-                        <div 
-                          className="absolute inset-0 bg-stone-300"
-                          style={{ backgroundColor: activeColor, opacity: 0.5 }}
-                        />
+            <div className="space-y-3">
+              {activeWaypoints.map((wp, index) => {
+                const isFirst = index === 0;
+                const isLast = index === activeWaypoints.length - 1;
+                const displayName = wp.locationName || wp.title;
+                const isAviation = wp.icon === "flight" || 
+                                   wp.title.includes("起飛") || 
+                                   wp.title.includes("抵達") || 
+                                   wp.title.includes("機場") || 
+                                   wp.title.includes("降落") || 
+                                   wp.title.includes("飛往") || 
+                                   wp.title.includes("班機");
+
+                return (
+                  <div key={`wp-item-${index}`} className="relative flex items-center justify-between group gap-4">
+                    <div className="flex items-center gap-2">
+                      {/* Round Bullet Node */}
+                      <div 
+                        className={`absolute left-[3px] w-1.5 h-1.5 rounded-full ${
+                          isFirst
+                            ? "bg-stone-900"
+                            : isLast
+                            ? "bg-rose-600"
+                            : "bg-orange-500"
+                        }`}
+                      />
+
+                      {/* Display name with step number */}
+                      <div className="flex items-center gap-1.5 pl-3">
+                        <span className="text-[11px] font-bold text-stone-400 font-mono">
+                          {index + 1}.
+                        </span>
+                        <span className="text-xs sm:text-sm font-semibold text-stone-700">
+                          {displayName}
+                        </span>
                       </div>
-                    )}
-                  </React.Fragment>
+
+                      {/* ONLY display time for aviation/flights (as requested) */}
+                      {isAviation && wp.time && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-100/50 px-1.5 py-0.5 rounded-sm font-mono">
+                          <Clock className="w-3 h-3" />
+                          {wp.time}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 );
               })}
             </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+            <Compass className="w-8 h-8 text-stone-300 stroke-[1.5] mb-2" />
+            <p className="text-xs font-medium text-stone-600">
+              本日無特定行程景點路徑
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -578,3 +660,4 @@ export const TravelMap: React.FC<TravelMapProps> = ({ activeDay, allDays }) => {
         </div>
       </div>
 ============================================================================ */
+
