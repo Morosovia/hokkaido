@@ -1,14 +1,10 @@
 import fs from "fs/promises";
 import path from "path";
-import { fileURLToPath } from "url";
 import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getFirestore, Firestore } from "firebase-admin/firestore";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Local JSON fallback paths
-const DATA_DIR = path.join(__dirname, "data");
+// Local JSON fallback paths - using process.cwd() is safe in both ESM and CJS bundle formats
+const DATA_DIR = path.join(process.cwd(), "data");
 const DATA_FILE = path.join(DATA_DIR, "expenses.json");
 
 // Default initial expenses if database is empty
