@@ -270,14 +270,10 @@ export const TravelMap: React.FC<TravelMapProps> = ({ activeDay, allDays }) => {
     }
   };
 
-  // GPU-Accelerated centering transform calculation for dynamic bounding box zooming
-  const transformStyle = React.useMemo(() => {
+  // 1. Calculate active scale and translation
+  const { scale, tx, ty } = React.useMemo(() => {
     if (showAllLines || activePoints.length === 0) {
-      return {
-        transform: "translate(0px, 0px) scale(1)",
-        transformOrigin: "0 0",
-        transition: "transform 0.6s cubic-bezier(0.16, 1, 0.3, 1)",
-      };
+      return { scale: 1.0, tx: 0, ty: 0 };
     }
 
     // Get active path boundaries
@@ -300,26 +296,30 @@ export const TravelMap: React.FC<TravelMapProps> = ({ activeDay, allDays }) => {
     const centerY = (minY + maxY) / 2;
 
     // Screen dimensions: 600 width, 340 height
-    // Calculate scale factors, reserving 90px horizontal margin & 70px vertical margin for labels
-    const scaleX = (600 - 90) / finalDx;
-    const scaleY = (340 - 70) / finalDy;
+    // We reserve generous margins (160px on width, 110px on height) to keep stations safely away from boundaries
+    const scaleX = (600 - 160) / finalDx;
+    const scaleY = (340 - 110) / finalDy;
     
     // Choose the minimum scale factor to fit everything comfortably
-    let scale = Math.min(scaleX, scaleY);
+    let scaleVal = Math.min(scaleX, scaleY);
     
-    // Cap the scale between 1x and 2.8x to preserve elegant schematic readability
-    scale = Math.max(1.0, Math.min(2.8, scale));
+    // Cap the scale between 1x and 2.0x to preserve elegant schematic readability and prevent label overcrowding
+    scaleVal = Math.max(1.0, Math.min(2.0, scaleVal));
 
     // Calculate translation coordinates to center the bounding box exactly on (300, 170)
-    const tx = 300 - centerX * scale;
-    const ty = 170 - centerY * scale;
+    const txVal = 300 - centerX * scaleVal;
+    const tyVal = 170 - centerY * scaleVal;
 
+    return { scale: scaleVal, tx: txVal, ty: tyVal };
+  }, [showAllLines, activePoints]);
+
+  const transformStyle = React.useMemo(() => {
     return {
       transform: `translate(${tx.toFixed(1)}px, ${ty.toFixed(1)}px) scale(${scale.toFixed(2)})`,
       transformOrigin: "0 0",
       transition: "transform 0.6s cubic-bezier(0.16, 1, 0.3, 1)",
     };
-  }, [showAllLines, activePoints]);
+  }, [tx, ty, scale]);
 
   return (
     <div className="flex flex-col flex-1 min-h-0 bg-stone-50 border border-stone-200 rounded-2xl overflow-hidden shadow-xs" id="map-container">
@@ -380,9 +380,9 @@ export const TravelMap: React.FC<TravelMapProps> = ({ activeDay, allDays }) => {
           <svg
             viewBox="0 0 600 340"
             className="h-full w-auto shrink-0"
-            style={{ aspectRatio: "600 / 340" }}
+            style={{ aspectRatio: "600 / 340", overflow: "visible" }}
           >
-            {/* We wrap everything inside a <g> and apply GPU-accelerated centering & zooming */}
+            {/* We wrap everything inside a <g> and apply centering & zooming */}
             <g style={transformStyle}>
               {/* 1. Metro Tracks (Behind nodes) */}
               {showAllLines ? (
@@ -398,7 +398,7 @@ export const TravelMap: React.FC<TravelMapProps> = ({ activeDay, allDays }) => {
                         d={linePathD}
                         fill="none"
                         stroke="#e4e4e7" // zinc-200
-                        strokeWidth={isCurrentDay ? 8.5 : 5.5}
+                        strokeWidth={(isCurrentDay ? 8.5 : 5.5) / scale}
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         opacity={isCurrentDay ? 1.0 : 0.4}
@@ -408,8 +408,8 @@ export const TravelMap: React.FC<TravelMapProps> = ({ activeDay, allDays }) => {
                         d={linePathD}
                         fill="none"
                         stroke={line.color}
-                        strokeWidth={isCurrentDay ? 4.5 : 3.0}
-                        strokeDasharray="5 4"
+                        strokeWidth={(isCurrentDay ? 4.5 : 3.0) / scale}
+                        strokeDasharray={`${5 / scale} ${4 / scale}`}
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         opacity={isCurrentDay ? 1.0 : 0.45}
@@ -429,7 +429,7 @@ export const TravelMap: React.FC<TravelMapProps> = ({ activeDay, allDays }) => {
                           d={linePathD}
                           fill="none"
                           stroke="#e2e8f0" // slate-200
-                          strokeWidth={8.5}
+                          strokeWidth={8.5 / scale}
                           strokeLinecap="round"
                           strokeLinejoin="round"
                         />
@@ -438,8 +438,8 @@ export const TravelMap: React.FC<TravelMapProps> = ({ activeDay, allDays }) => {
                           d={linePathD}
                           fill="none"
                           stroke={activeColor}
-                          strokeWidth={4.5}
-                          strokeDasharray="5 4"
+                          strokeWidth={4.5 / scale}
+                          strokeDasharray={`${5 / scale} ${4 / scale}`}
                           strokeLinecap="round"
                           strokeLinejoin="round"
                         />
@@ -471,46 +471,52 @@ export const TravelMap: React.FC<TravelMapProps> = ({ activeDay, allDays }) => {
                     <circle
                       cx={data.x}
                       cy={data.y}
-                      r={isTodayStation ? 8.5 : 6.5}
+                      r={(isTodayStation ? 8.5 : 6.5) / scale}
                       fill={nodeColor}
                     />
                     {/* White inner center */}
                     <circle
                       cx={data.x}
                       cy={data.y}
-                      r={isTodayStation ? 5.0 : 3.8}
+                      r={(isTodayStation ? 5.0 : 3.8) / scale}
                       fill="#ffffff"
                     />
                     {/* Center core spot */}
                     <circle
                       cx={data.x}
                       cy={data.y}
-                      r={isTodayStation ? 2.2 : 1.6}
+                      r={(isTodayStation ? 2.2 : 1.6) / scale}
                       fill={nodeColor}
                     />
 
                     {/* Text Label background protection shadow */}
                     <text
-                      x={data.x + textProps.dx}
-                      y={data.y + textProps.dy}
+                      x={data.x + textProps.dx / scale}
+                      y={data.y + textProps.dy / scale}
                       textAnchor={textProps.textAnchor}
-                      className="text-[9px] font-bold fill-white stroke-white stroke-[4px] select-none"
+                      style={{ fontSize: `${(9.5 / scale).toFixed(1)}px` }}
+                      strokeWidth={3.5 / scale}
+                      className="font-bold fill-white stroke-white select-none"
                     >
                       {data.name}
                     </text>
                     {/* Actual Station Text Label with Day suffix */}
                     <text
-                      x={data.x + textProps.dx}
-                      y={data.y + textProps.dy}
+                      x={data.x + textProps.dx / scale}
+                      y={data.y + textProps.dy / scale}
                       textAnchor={textProps.textAnchor}
-                      className="text-[9.5px] select-none"
+                      style={{ fontSize: `${(9.5 / scale).toFixed(1)}px` }}
+                      className="select-none"
                     >
                       {/* Station Name */}
                       <tspan className={isTodayStation ? "font-black fill-stone-900" : "font-semibold fill-stone-500"}>
                         {data.name}
                       </tspan>
                       {/* Suffix like (D1) or (D2-5) */}
-                      <tspan className={`font-mono text-[8px] font-semibold ml-0.5 ${isTodayStation ? "fill-rose-600" : "fill-stone-400"}`}>
+                      <tspan 
+                        className={`font-mono font-semibold ml-0.5 ${isTodayStation ? "fill-rose-600" : "fill-stone-400"}`}
+                        style={{ fontSize: `${(8.0 / scale).toFixed(1)}px` }}
+                      >
                         {` (${rangeStr})`}
                       </tspan>
                     </text>
