@@ -104,7 +104,7 @@ export const itineraries: DayItinerary[] = [
     weekday: "一",
     summary: "北上沿海大長征，宗谷岬日本最北端，眺望白色貝殼路",
     meals: { breakfast: "飯店內享用", lunch: "自理 (推薦留萌或稚內海鮮)", dinner: "飯店內溫泉宴席" },
-    accommodation: "稚內MEGUMA溫泉飯店 (Wakkanai Meguma Hotel) 或同級",
+    accommodation: "稚內MEGUMA溫泉飯店 (Wakkanai Meguma Hotel) ",
     activities: [
       {
         time: "08:30",
@@ -153,7 +153,7 @@ export const itineraries: DayItinerary[] = [
     weekday: "二",
     summary: "乘渡輪遠征神秘禮文島，野寒布岬唯美落日",
     meals: { breakfast: "飯店內享用", lunch: "自理 (推薦禮文島島旬海鮮飯)", dinner: "飯店內溫泉宴席" },
-    accommodation: "稚內MEGUMA溫泉飯店 (Wakkanai Meguma Hotel) 或同級",
+    accommodation: "稚內MEGUMA溫泉飯店 (Wakkanai Meguma Hotel) ",
     activities: [
       {
         time: "06:00",
@@ -213,7 +213,7 @@ export const itineraries: DayItinerary[] = [
     weekday: "三",
     summary: "南下旭川，品味男山美酒，陶醉美瑛七彩花海",
     meals: { breakfast: "飯店內享用", lunch: "自理 (推薦旭川拉麵村)", dinner: "飯店內豪華自助餐" },
-    accommodation: "新富良野王子大飯店 (New Furano Prince Hotel) 或同級",
+    accommodation: "新富良野王子大飯店 (New Furano Prince Hotel) ",
     activities: [
       {
         time: "08:30",
@@ -262,7 +262,7 @@ export const itineraries: DayItinerary[] = [
     weekday: "四",
     summary: "富良野深度花香之旅，浪漫精靈森林露臺",
     meals: { breakfast: "飯店內享用", lunch: "自理", dinner: "飯店內豪華自助餐" },
-    accommodation: "新富良野王子大飯店 (New Furano Prince Hotel) 或同級",
+    accommodation: "新富良野王子大飯店 (New Furano Prince Hotel) ",
     activities: [
       {
         time: "09:00",
@@ -317,7 +317,7 @@ export const itineraries: DayItinerary[] = [
     weekday: "五",
     summary: "夢幻白金青池，重返札幌神宮與大通公園",
     meals: { breakfast: "飯店內享用", lunch: "自理 (推薦札幌湯咖哩)", dinner: "自理 (推薦薄野拉麵橫丁)" },
-    accommodation: "札幌美居酒店 (Mercure Hotel Sapporo) 或同級",
+    accommodation: "札幌美居酒店 (Mercure Hotel Sapporo) ",
     activities: [
       {
         time: "09:00",
@@ -381,7 +381,7 @@ export const itineraries: DayItinerary[] = [
     weekday: "六",
     summary: "童話尼克斯城堡，洞爺湖乘汽船巡禮",
     meals: { breakfast: "飯店內享用", lunch: "尼克斯日式壽喜燒", dinner: "飯店內溫泉宴席" },
-    accommodation: "洞爺萬世閣溫泉飯店 (Toya Manseikaku Hotel) 或同級",
+    accommodation: "洞爺萬世閣溫泉飯店 (Toya Manseikaku Hotel) ",
     activities: [
       {
         time: "08:30",
@@ -447,7 +447,7 @@ export const itineraries: DayItinerary[] = [
     weekday: "日",
     summary: "大小沼綠意盎然，五稜郭登塔，函館百萬夜景",
     meals: { breakfast: "飯店內享用", lunch: "自理", dinner: "自理 (推薦函館鹽味拉麵)" },
-    accommodation: "函館國際飯店 (Hakodate International Hotel) 或同級",
+    accommodation: "函館國際飯店 (Hakodate International Hotel) ",
     activities: [
       {
         time: "08:30",
@@ -478,15 +478,6 @@ export const itineraries: DayItinerary[] = [
       },
       {
         time: "15:00",
-        title: "入住 函館國際飯店",
-        description: "入住極富盛名的港口酒店，其溫泉可眺望函館港灣，早餐更是全日本排名頂尖的海鮮自助百匯。",
-        icon: "hotel",
-        locationName: "函館國際飯店",
-        coordinates: COORDS.hakodate_international,
-        googleMapsQuery: "Hakodate International Hotel"
-      },
-      {
-        time: "18:00",
         title: "搭乘函館山纜車 欣賞百萬夜景",
         description: "乘大型空中纜車直達函館山頂。隨著暮色漸濃，兩側港灣夾峙下的函館市區燈火齊亮，呈現出舉世聞名的「百萬璀璨雙弧線夜景」。",
         icon: "transport",
@@ -494,6 +485,15 @@ export const itineraries: DayItinerary[] = [
         coordinates: COORDS.hakodate_cableway,
         googleMapsQuery: "Mount Hakodate Ropeway",
         duration: "停留 1.5 小時"
+      },
+      {
+        time: "18:00",
+        title: "入住 函館國際飯店",
+        description: "入住極富盛名的港口酒店，其溫泉可眺望函館港灣，早餐更是全日本排名頂尖的海鮮自助百匯。",
+        icon: "hotel",
+        locationName: "函館國際飯店",
+        coordinates: COORDS.hakodate_international,
+        googleMapsQuery: "Hakodate International Hotel"
       }
     ]
   },
@@ -503,7 +503,7 @@ export const itineraries: DayItinerary[] = [
     weekday: "一",
     summary: "函館朝市鮮味，元町異國風情，紅磚倉庫漫步",
     meals: { breakfast: "飯店內享用 (超澎湃海鮮丼自助)", lunch: "自理 (推薦倉庫內漢堡排)", dinner: "自理" },
-    accommodation: "函館國際飯店 (Hakodate International Hotel) 或同級",
+    accommodation: "函館國際飯店 (Hakodate International Hotel) ",
     activities: [
       {
         time: "08:30",
@@ -550,7 +550,7 @@ export const itineraries: DayItinerary[] = [
     date: "8月25日",
     weekday: "二",
     summary: "神聖修道院，美味小丑漢堡，滿載而歸搭機返台",
-    meals: { breakfast: "飯店內享用 (頂級朝市海鮮丼)", lunch: "小丑漢堡或鹽味拉麵", dinner: "機上套餐" },
+    meals: { breakfast: "飯店內享用 (頂級朝市海鮮丼)", lunch: "自理（推薦小丑漢堡或鹽味拉麵）", dinner: "機上套餐" },
     accommodation: "溫馨的家 (Sweet Home)",
     activities: [
       {
